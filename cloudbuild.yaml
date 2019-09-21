@@ -7,6 +7,7 @@ steps:
   args: [ '-c', 'docker push gcr.io/$PROJECT_ID/villith/brokerpongbot:$SHORT_SHA' ]
 - name: 'gcr.io/cloud-builders/gcloud'
   args: ['beta', 'run', 'deploy', 'brokerpongbot', '--image', 'gcr.io/$PROJECT_ID/villith/brokerpongbot:$SHORT_SHA', '--region', 'us-east1', '--platform', 'managed', '--allow-unauthenticated']
+  env: ['SLACK_TOKEN=xoxb-749408629571-760936650277-zIGwEIkmjkH0M8B7BihHgbwg', 'SLACK_SIGNING_SECRET=cf39863e9fab8053f9e586753fa06949', 'COMMAND_INITIATOR=!']
 images:
   - 'gcr.io/$PROJECT_ID/villith/brokerpongbot:$SHORT_SHA'
 
