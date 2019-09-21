@@ -1,8 +1,11 @@
 FROM node:alpine
 
-WORKDIR /server
+USER node
 
-COPY . /server
+RUN mkdir /home/node/brokerpongbot
+WORKDIR /home/node/brokerpongbot
+
+COPY . /home/node/brokerpongbot
 RUN npm set unsafe-perm true
 RUN npm install
 
