@@ -10,4 +10,6 @@ RUN npm install
 
 COPY . /
 
+RUN tsc
+
 CMD [ "npm", "start" ]
