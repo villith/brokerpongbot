@@ -1,12 +1,12 @@
 FROM node:alpine
 
-USER node
+WORKDIR /usr/src/app
 
-RUN mkdir /home/node/brokerpongbot
-WORKDIR /home/node/brokerpongbot
+COPY package*.json ./
 
-COPY . /home/node/brokerpongbot
-RUN sudo npm set unsafe-perm true
-RUN sudo npm install
+RUN npm set unsafe-perm true
+RUN npm install
+
+COPY . /
 
 CMD [ "npm", "start" ]
