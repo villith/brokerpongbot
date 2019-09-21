@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "scripts": {
     "postinstall": "tsc",
-    "start": "./lib/index.js"
+    "start": "node ./lib/index.js"
   },
   "dependencies": {
     "@slack/events-api": "^2.3.0",
