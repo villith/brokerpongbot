@@ -2,15 +2,12 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   entrypoint: 'bash'
   args: [ '-c', 'docker build -t gcr.io/$PROJECT_ID/villith/brokerpongbot:$SHORT_SHA .' ]
-  env:
-  - 'CLOUDSDK_COMPUTE_ZONE=us-central1-b'
-  - 'CLOUDSDK_CONTAINER_CLUSTER=brokerpong'
-  - 'SLACK_TOKEN='
-  - 'SLACK_SIGNING_SECRET='
-  - 'PORT=3005'
-  - 'COMMAND_INITIATOR=!'
-
-images:
-- 'gcr.io/$PROJECT_ID/villith/brokerpongbot'
+- name: 'gcr.io/cloud-builders/docker'
+  entrypoint: 'bash'
+  args: [ '-c', 'docker push -t gcr.io/$PROJECT_ID/villith/brokerpongbot:$SHORT_SHA .' ]
+- name: 'gcr.io/cloud-builders/gcloud'
+    args: ['beta', 'run', 'deploy', 'brokerpongbot', '--image', 'gcr.io/$PROJECT_ID/villith/brokerpongbot:$SHORT_SHA', '--region', 'us-central1-b', '--platform', 'managed', '--allow-unauthenticated']
+  images:
+    - 'gcr.io/$PROJECT_ID/villith/brokerpongbot:$SHORT_SHA'
 
 timeout: 1200s

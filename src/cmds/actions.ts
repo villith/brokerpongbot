@@ -36,6 +36,7 @@ const commands: Action = (
   
   message.attachments = attachments;
 
+  console.log('posting message');
   client.chat.postMessage(message);
 };
 
