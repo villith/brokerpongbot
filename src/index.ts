@@ -56,6 +56,10 @@ slackEvents.on('message', async (event: IMessageEvent) => {
     channel,
   } = event;
 
+  console.log('RECEIVED MESSAGE');
+
+  console.log(text, channel);
+
   if (text.charAt(0) !== CMD) { return; }
 
   const textCommand = text.substr(1, text.indexOf(' '));
