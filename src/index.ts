@@ -1,12 +1,9 @@
-import PlayerModel from '../../functions/src/models/Player';
 import { WebClient } from '@slack/web-api';
 import bodyParser from 'body-parser';
 import { createEventAdapter } from '@slack/events-api';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
 import express from 'express';
-import https from 'https';
-import mongoose from 'mongoose';
 
 dotenv.config();
 
@@ -29,8 +26,6 @@ interface IMessageEvent {
   event_ts: string;
   channel_type: string;
 }
-
-mongoose.connect(process.env.MONGO_URL!);
 
 const slackSigningSecret = process.env.SLACK_SIGNING_SECRET!;
 const token = process.env.SLACK_TOKEN;
@@ -69,16 +64,11 @@ slackEvents.on('message', async (event: IMessageEvent) => {
 
   if (!command) { return `${textCommand} is not a command. Type !commands for a command list.`; }
 
-  await https.get('')
-  if (player) {
-    const result = await web.chat.postMessage({
-      text: `This is their nickname: ${player.nickname}`,
-      channel,
-    });
-    console.log('result obj from posting msg');
-    console.log(result);
-  }
-  console.log('this is a message!');
-  console.log(event);
+  // await https.get('')
+  // if (player) {
+  await web.chat.postMessage({
+    text: command(),
+    channel,
+  });
   return;
 });

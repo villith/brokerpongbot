@@ -5,6 +5,10 @@ steps:
   env:
   - 'CLOUDSDK_COMPUTE_ZONE=us-central1-b'
   - 'CLOUDSDK_CONTAINER_CLUSTER=brokerpong'
+  - 'SLACK_TOKEN='
+  - 'SLACK_SIGNING_SECRET='
+  - 'PORT=3005'
+  - 'COMMAND_INITIATOR=!'
 
 images:
 - 'gcr.io/$PROJECT_ID/villith/brokerpongbot'
