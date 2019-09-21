@@ -64,3 +64,7 @@ bbpong.pem
 config.default.json
 config.json
 key.json
+
+# Generated files for local testing
+
+lib/
