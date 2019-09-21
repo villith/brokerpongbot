@@ -6,7 +6,7 @@ steps:
   entrypoint: 'bash'
   args: [ '-c', 'docker push -t gcr.io/$PROJECT_ID/villith/brokerpongbot:$SHORT_SHA .' ]
 - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['beta', 'run', 'deploy', 'brokerpongbot', '--image', 'gcr.io/$PROJECT_ID/villith/brokerpongbot:$SHORT_SHA', '--region', 'us-central1-b', '--platform', 'managed', '--allow-unauthenticated']
+  args: ['beta', 'run', 'deploy', 'brokerpongbot', '--image', 'gcr.io/$PROJECT_ID/villith/brokerpongbot:$SHORT_SHA', '--region', 'us-central1-b', '--platform', 'managed', '--allow-unauthenticated']
   images:
     - 'gcr.io/$PROJECT_ID/villith/brokerpongbot:$SHORT_SHA'
 
