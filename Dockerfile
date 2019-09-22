@@ -15,5 +15,6 @@ COPY . /
 ENV SLACK_TOKEN=xoxb-749408629571-760936650277-zIGwEIkmjkH0M8B7BihHgbwg
 ENV SLACK_SIGNING_SECRET=cf39863e9fab8053f9e586753fa06949
 ENV COMMAND_INITIATOR=!
+ENV GCP_ROOT_URL=https://us-central1-brokerpong.cloudfunctions.net/
 
 CMD [ "npm", "start" ]
