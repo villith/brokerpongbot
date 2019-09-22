@@ -1,21 +1,52 @@
-import { Action, IMessageEvent } from "../types";
-import { ChatPostMessageArguments, MessageAttachment, WebClient } from "@slack/web-api";
+import { ChatPostMessageArguments, MessageAttachment } from "@slack/web-api";
 
+import { Action } from "../types";
 import COMMANDS from "./cmds";
+import axios from 'axios';
 
-const addPlayer: Action = (
-  client: WebClient,
-  msg: IMessageEvent,
-  args: any
+const addPlayer: Action = async (
+  client,
+  msg,
+  args,
 ) => {
-  console.log(msg);
-  console.log(args);
+  const message: ChatPostMessageArguments = {
+    text: '',
+    channel: msg.channel,
+  };
+
+  const invalidNameText = 'User was not created. You must provide a name for the user. `!addPlayer <name>`';
+  if (!args) {
+    message.text = invalidNameText;
+    client.chat.postMessage(message);
+    return;
+  }
+  
+  const [name] = args;
+  if (!name) {
+    message.text = invalidNameText;
+    client.chat.postMessage(message);
+    return;
+  }
+
+  const { data } = await axios.post('add-player', { name });
+
+  message.text = data;
+
+  client.chat.postMessage(message);
+};
+
+const getStandings: Action = (
+  client,
+  msg,
+  args,
+) => {
+
 };
 
 const commands: Action = (
-  client: WebClient,
-  msg: IMessageEvent,
-  args: any
+  client,
+  msg,
+  args,
 ) => {
   const message: ChatPostMessageArguments = {
     text: 'BrokerPongBot Commands',

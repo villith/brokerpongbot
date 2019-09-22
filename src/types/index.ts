@@ -5,7 +5,7 @@ export type Commands = 'addPlayer' | 'commands';
 export type Action = (
   client: WebClient,
   msg: IMessageEvent,
-  ...args: unknown[]
+  ...args: string[]
 ) => unknown;
 
 export type CommandListMap = Record<Commands, ICommand>;

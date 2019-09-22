@@ -1,5 +1,6 @@
 import { IMessageEvent } from './types';
 import { WebClient } from '@slack/web-api';
+import axios from 'axios';
 import bodyParser from 'body-parser';
 import { createEventAdapter } from '@slack/events-api';
 import { createServer } from 'http';
@@ -8,6 +9,8 @@ import { executeCommand } from './helpers';
 import express from 'express';
 
 dotenv.config();
+
+axios.defaults.baseURL = process.env.GCP_ROOT_URL;
 
 const CMD = process.env.COMMAND_INITIATOR;
 
