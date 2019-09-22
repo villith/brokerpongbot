@@ -7,7 +7,7 @@ import axios from 'axios';
 const addPlayer: Action = async (
   client,
   msg,
-  args,
+  name,
 ) => {
   const message: ChatPostMessageArguments = {
     text: '',
@@ -15,13 +15,12 @@ const addPlayer: Action = async (
   };
 
   const invalidNameText = 'User was not created. You must provide a name for the user. `!addPlayer <name>`';
-  if (!args) {
+  if (!name) {
     message.text = invalidNameText;
     client.chat.postMessage(message);
     return;
   }
   
-  const [name] = args;
   if (!name) {
     message.text = invalidNameText;
     client.chat.postMessage(message);
@@ -35,18 +34,17 @@ const addPlayer: Action = async (
   client.chat.postMessage(message);
 };
 
-const getStandings: Action = (
-  client,
-  msg,
-  args,
-) => {
+// const getStandings: Action = (
+//   client,
+//   msg,
+//   args,
+// ) => {
 
-};
+// };
 
 const commands: Action = (
   client,
   msg,
-  args,
 ) => {
   const message: ChatPostMessageArguments = {
     text: 'BrokerPongBot Commands',
