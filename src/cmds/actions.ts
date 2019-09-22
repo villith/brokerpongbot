@@ -9,6 +9,7 @@ const addPlayer: Action = async (
   msg,
   name,
 ) => {
+  console.log('[addPlayer]');
   const message: ChatPostMessageArguments = {
     text: '',
     channel: msg.channel,
@@ -27,7 +28,9 @@ const addPlayer: Action = async (
     return;
   }
 
+  console.log('before post');
   const { data } = await axios.post('add-player', { name });
+  console.log('after post');
 
   message.text = data;
 
