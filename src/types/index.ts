@@ -1,6 +1,6 @@
 import { WebClient } from "@slack/web-api";
 
-export type Commands = 'addPlayer' | 'commands';
+export type Commands = 'addplayer' | 'commands' | 'changenickname';
 
 export type Action = (
   client: WebClient,

@@ -26,13 +26,15 @@ const executeCommand = (msg: IMessageEvent, client: WebClient) => {
 
 const getCommand = (accessor: string) => {
   let retVal = {} as ICommand;
-  if ({}.hasOwnProperty.call(COMMANDS, accessor)) {
-    retVal = COMMANDS[accessor];
+  const normalized = accessor.toLowerCase().trim();
+  if ({}.hasOwnProperty.call(COMMANDS, normalized)) {
+    retVal = COMMANDS[normalized];
     return retVal;
   }
   const values = Object.values(COMMANDS);
-  for (const command of values) {    
-    if (command.aliases.includes[accessor]) {
+  for (const command of values) {
+    const normalizedAliases = command.aliases.map(alias => alias.toLowerCase());
+    if (normalizedAliases.includes[normalized]) {
       retVal = command;
       break;
     }

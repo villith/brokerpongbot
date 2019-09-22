@@ -1,9 +1,9 @@
-import { addPlayer, commands } from './actions';
+import { addPlayer, changeNickname, commands } from './actions';
 
 import { CommandListMap } from '../types';
 
 const COMMANDS: CommandListMap = {
-  addPlayer: {
+  addplayer: {
     name: "addPlayer",
     description: "Adds a player to the bot",
     aliases: ["addUser", "newPlayer", "newUser"],
@@ -14,7 +14,13 @@ const COMMANDS: CommandListMap = {
     description: "Displays a list of user commands",
     aliases: ["command", "commandlist", "listcommands"],
     action: commands,
-  }
+  },
+  changenickname: {
+    name: "changeNickname",
+    description: "Changes a user's nickname",
+    aliases: ["nickname"],
+    action: changeNickname,
+  },
 };
 
 export default COMMANDS;

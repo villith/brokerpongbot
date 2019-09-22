@@ -21,16 +21,36 @@ const addPlayer: Action = async (
     client.chat.postMessage(message);
     return;
   }
-  
-  if (!name) {
+
+  console.log('before post');
+  const { data } = await axios.post('add-player', { name });
+  console.log('after post');
+
+  message.text = data;
+
+  client.chat.postMessage(message);
+};
+
+const changeNickname: Action = async (
+  client,
+  msg,
+  name,
+  nickname,
+) => {
+  console.log('[changeNickname]');
+  const message: ChatPostMessageArguments = {
+    text: '',
+    channel: msg.channel,
+  };
+
+  const invalidNameText = 'Nickname was not updated. You must provide the user\'s name and the intended nickname. `!changeNickname <name> <nickname>`';
+  if (!name || !nickname) {
     message.text = invalidNameText;
     client.chat.postMessage(message);
     return;
   }
 
-  console.log('before post');
-  const { data } = await axios.post('add-player', { name });
-  console.log('after post');
+  const { data } = await axios.post('change-nickname', { name, nickname });
 
   message.text = data;
 
@@ -72,4 +92,8 @@ const commands: Action = (
   client.chat.postMessage(message);
 };
 
-export { addPlayer, commands };
+export {
+  addPlayer,
+  changeNickname,
+  commands,
+};
