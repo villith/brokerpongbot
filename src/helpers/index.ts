@@ -15,7 +15,7 @@ const executeCommand = (msg: IMessageEvent, client: WebClient) => {
   if (accessor) {
     const command = getCommand(accessor);
     if (command) {
-      command.action(client, msg, args);
+      command.action(client, msg, ...args);
     }
     else {
       // msg.channel.send(`\`!${command}\` is not a command. Type \`!commands\` for a list of commands.`);
