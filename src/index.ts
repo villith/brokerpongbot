@@ -1,11 +1,14 @@
-import { IMessageEvent } from './types';
+import { IActionEvent, IChannelListApiResult, IMessageEvent } from './types';
+import { buildMatchMessage, executeCommand } from './helpers';
+
+import { MatchModel } from '@team-scott/domain';
 import { WebClient } from '@slack/web-api';
 import axios from 'axios';
 import bodyParser from 'body-parser';
 import { createEventAdapter } from '@slack/events-api';
+import { createMessageAdapter } from '@slack/interactive-messages';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
-import { executeCommand } from './helpers';
 import express from 'express';
 
 dotenv.config();
@@ -18,27 +21,48 @@ const slackSigningSecret = process.env.SLACK_SIGNING_SECRET!;
 const token = process.env.SLACK_TOKEN;
 const port = process.env.PORT || 3000;
 const slackEvents = createEventAdapter(slackSigningSecret);
+const slackActions = createMessageAdapter(slackSigningSecret);
 const client = new WebClient(token);
+const userClient = new WebClient(process.env.SLACK_USER_TOKEN);
 
-// Create an express application
 const app = express();
 
-// Plug the adapter in as a middleware
-app.use('/', slackEvents.requestListener());
-
-// Example: If you're using a body parser, always put it after the event adapter in the middleware stack
+app.use('/events', slackEvents.requestListener());
+app.use('/actions', slackActions.requestListener());
 app.use(bodyParser());
 
-// Initialize a server for the express app - you can skip this and the rest if you prefer to use app.listen()
 const server = createServer(app);
 
-server.listen(port, () => {
-  // Log a message when the server is ready
+server.listen(port, async () => {
   // @ts-ignore
   console.log(`Listening for events on ${server.address().port}`);
+  const { channels } = await client.channels.list() as IChannelListApiResult;
+  const matchStatusChannel = channels.find(channel => channel.name === process.env.MATCH_STATUS_CHANNEL);
+  
+  if (matchStatusChannel) {
+    const { messages } = await userClient.channels.history({ channel: matchStatusChannel.id });
+    const promises = Object.values(messages as object).map(message => userClient.chat.delete({
+      channel: matchStatusChannel.id,
+      ts: message.ts,
+    }));
+    await Promise.all(promises);
+
+    const ongoingMatches = await MatchModel.find({
+      status: {
+        $in: ['in-progress', 'pending']
+      }
+    }).populate('initiator', 'target');
+
+    if (ongoingMatches.length > 0) {
+      const message = buildMatchMessage(matchStatusChannel.id, ongoingMatches[0]);
+      client.chat.postMessage(message);
+    }
+  }
 });
 
-slackEvents.on('message', async (event: IMessageEvent) => {
+slackEvents.on('message', (event: IMessageEvent) => {
+  console.log('[message]');
+  console.log(event);
   const { text } = event;
 
   // Early return if message is not a command
@@ -47,4 +71,8 @@ slackEvents.on('message', async (event: IMessageEvent) => {
   executeCommand(event, client);
   
   return;
+});
+
+slackActions.action('action', (payload: IActionEvent, res) => {
+  console.dir(payload, { depth: null });
 });
