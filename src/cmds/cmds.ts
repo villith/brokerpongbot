@@ -30,7 +30,7 @@ const COMMANDS: CommandListMap = {
   challengeplayer: {
     name: 'challengePlayer',
     description: 'Challenges another player to a game',
-    aliases: ['challenge', 'play', 'cp'],
+    aliases: ['challenge', 'play'],
     action: challengePlayer,
     roles: ['ADMIN', 'USER'],
     arguments: ['player/nickname']

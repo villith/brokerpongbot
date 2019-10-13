@@ -4,7 +4,7 @@
   "scripts": {
     "postinstall": "tsc",
     "start": "node ./lib/index.js",
-    "start-local": "ts-node src/index.ts"
+    "start-local": "SET DEBUG=* && ts-node src/index.ts"
   },
   "dependencies": {
     "@slack/events-api": "^2.3.0",
@@ -21,7 +21,7 @@
     "@types/node": "^12.7.5",
     "tslint": "^5.20.0",
     "tslint-config-prettier": "^1.18.0",
-    "typescript": "^3.6.3"
+    "typescript": "^3.7.0-beta"
   },
   "main": "./lib/index.js"
 }

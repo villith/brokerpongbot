@@ -1,7 +1,7 @@
 import { IActionEvent, IChannelListApiResult, IMessageEvent } from './types';
+import { IActionResponse, Match } from '@team-scott/domain';
 import { buildMatchMessage, executeCommand } from './helpers';
 
-import { MatchModel } from '@team-scott/domain';
 import { WebClient } from '@slack/web-api';
 import axios from 'axios';
 import bodyParser from 'body-parser';
@@ -46,27 +46,21 @@ server.listen(port, async () => {
       ts: message.ts,
     }));
     await Promise.all(promises);
-
-    const ongoingMatches = await MatchModel.find({
-      status: {
-        $in: ['in-progress', 'pending']
-      }
-    }).populate('initiator', 'target');
-
-    if (ongoingMatches.length > 0) {
-      const message = buildMatchMessage(matchStatusChannel.id, ongoingMatches[0]);
+ 
+    const { data } = await axios.get<IActionResponse<Match[]>>('getOngoingMatches');    
+  
+    if (data?.data?.length) {
+      const message = await buildMatchMessage(userClient, matchStatusChannel.id, data?.data?.[0]);
       client.chat.postMessage(message);
     }
   }
 });
 
 slackEvents.on('message', (event: IMessageEvent) => {
-  console.log('[message]');
-  console.log(event);
   const { text } = event;
 
   // Early return if message is not a command
-  if (text.charAt(0) !== CMD) { return; }
+  if (text?.charAt(0) !== CMD) { return; }
 
   executeCommand(event, client);
   

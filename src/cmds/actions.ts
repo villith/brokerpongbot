@@ -149,9 +149,6 @@ const commands: ActionFunction = (
 
   message.blocks!.push(...blocks);
 
-  console.dir(message.blocks, { depth: null });
-
-  console.log('posting message');
   client.chat.postMessage(message);
 };
 
