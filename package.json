@@ -4,7 +4,8 @@
   "scripts": {
     "postinstall": "tsc",
     "start": "node ./lib/index.js",
-    "start-local": "SET DEBUG=* && ts-node src/index.ts"
+    "start-local": "ts-node src/index.ts",
+    "start-local-debug": "SET DEBUG=* && ts-node src/index.ts"
   },
   "dependencies": {
     "@slack/events-api": "^2.3.0",
@@ -18,7 +19,9 @@
   "devDependencies": {
     "@types/dotenv": "^6.1.1",
     "@types/express": "^4.17.1",
+    "@types/morgan": "^1.7.37",
     "@types/node": "^12.7.5",
+    "morgan": "^1.9.1",
     "tslint": "^5.20.0",
     "tslint-config-prettier": "^1.18.0",
     "typescript": "^3.7.0-beta"

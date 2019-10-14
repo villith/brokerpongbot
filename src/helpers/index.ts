@@ -1,10 +1,12 @@
 import { ChatPostMessageArguments, DividerBlock, MessageAttachment, SectionBlock, WebClient } from "@slack/web-api";
 import { IActionResponse, MATCH_STATUS_LABELS, Match, Player } from '@team-scott/domain';
-import { ICommand, IMessageEvent, IUserProfileApiResult } from "../types";
+import { IChannelListApiResult, ICommand, IMessageEvent, IResponseAction, IUserProfileApiResult, ResponseActions } from "../types";
 
 import COMMANDS from "../cmds/cmds";
+import RESPONSES from "../cmds/responses";
+import axios from 'axios';
 
-const executeCommand = (msg: IMessageEvent, client: WebClient) => {
+const executeCommand = async (msg: IMessageEvent, client: WebClient, userClient: WebClient) => {
   const { text } = msg;
 
   // Get everything after command initiator
@@ -25,7 +27,8 @@ const executeCommand = (msg: IMessageEvent, client: WebClient) => {
   if (accessor) {
     const command = getCommand(accessor);
     if (command) {
-      command.action(client, msg, ...args);
+      await command.action(client, msg, args);
+      await refreshCurrentMatches(client, userClient);
     }
     else {
       // msg.channel.send(`\`!${command}\` is not a command. Type \`!commands\` for a list of commands.`);
@@ -35,7 +38,7 @@ const executeCommand = (msg: IMessageEvent, client: WebClient) => {
 };
 
 const getCommand = (accessor: string) => {
-  let retVal = {} as ICommand;
+  let retVal = {} as ICommand<unknown>;
   const normalized = accessor.toLowerCase().trim();
   if ({}.hasOwnProperty.call(COMMANDS, normalized)) {
     retVal = COMMANDS[normalized];
@@ -52,11 +55,11 @@ const getCommand = (accessor: string) => {
   return retVal;
 };
 
-const buildErrorMessage = (msg: IMessageEvent, payload: IActionResponse) => {
+const buildErrorMessage = (channel: string, payload: IActionResponse<unknown>) => {
   const message: ChatPostMessageArguments = {
     text: '',
     mrkdwn: true,
-    channel: msg.channel,
+    channel,
   };
 
   const attachment: MessageAttachment = {
@@ -188,6 +191,47 @@ const buildMatchMessage = async (client: WebClient, channel: string, match: Matc
   ];
 
   return message;
+};
+
+const refreshCurrentMatches = async (client: WebClient, userClient: WebClient) => {
+  const { channels } = await client.channels.list() as IChannelListApiResult;
+  const matchStatusChannel = channels.find(channel => channel.name === process.env.MATCH_STATUS_CHANNEL);
+  
+  if (matchStatusChannel) {
+    const { messages } = await userClient.channels.history({ channel: matchStatusChannel.id });
+    const promises = Object.values(messages as object).map(message => userClient.chat.delete({
+      channel: matchStatusChannel.id,
+      ts: message.ts,
+    }));
+    await Promise.all(promises);
+ 
+    const { data } = await axios.get<IActionResponse<Match[]>>('getOngoingMatches');    
+  
+    if (data?.data?.length) {
+      const message = await buildMatchMessage(userClient, matchStatusChannel.id, data?.data?.[0]);
+      client.chat.postMessage(message);
+    }
+  }
+};
+
+const handleUserResponse = (payload: IResponseAction, client: WebClient) => {
+  const {
+    actions,
+    channel,
+    user,
+  } = payload;
+
+  console.log('[handleUserResponse]');
+  console.log(payload);
+
+  const [action] = actions;
+  const actionId = action?.action_id;
+
+  if ({}.hasOwnProperty.call(RESPONSES, actionId)) {
+    const responseAction = actionId as ResponseActions;
+    const responseActionFunction = RESPONSES[responseAction];
+    responseActionFunction(client, { action, channel, user });
+  }
 }
 
 export {
@@ -195,4 +239,6 @@ export {
   buildMatchMessage,
   getCommand,
   executeCommand,
+  handleUserResponse,
+  refreshCurrentMatches,
 };

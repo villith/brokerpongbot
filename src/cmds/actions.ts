@@ -1,8 +1,8 @@
 import { ActionFunction, IChannelListApiResult, IUserInfoApiResult } from "../types";
 import { ActionsBlock, Block, ChatPostMessageArguments, ContextBlock, DividerBlock, SectionBlock } from "@slack/web-api";
+import { IActionResponse, Match } from "@team-scott/domain";
 
 import COMMANDS from "./cmds";
-import { IActionResponse } from "@team-scott/domain";
 import axios from 'axios';
 import { buildErrorMessage } from "../helpers";
 
@@ -24,7 +24,7 @@ const register: ActionFunction = async (
   });
 
   if (data.error) {
-    const errorMessage = buildErrorMessage(msg, data);
+    const errorMessage = buildErrorMessage(msg.channel, data);
     client.chat.postMessage(errorMessage);
     return;
   }
@@ -34,11 +34,10 @@ const register: ActionFunction = async (
   client.chat.postMessage(message);
 };
 
-const changeNickname: ActionFunction = async (
+const changeNickname: ActionFunction<[string, string]> = async (
   client,
   msg,
-  name,
-  nickname,
+  [name, nickname],
 ) => {
   console.log(name, nickname);
   console.log('[changeNickname]');
@@ -57,7 +56,7 @@ const changeNickname: ActionFunction = async (
   const { data } = await axios.post<IActionResponse>('change-nickname', { name, nickname });
 
   if (data.error) {
-    const errorMessage = buildErrorMessage(msg, data);
+    const errorMessage = buildErrorMessage(msg.channel, data);
     client.chat.postMessage(errorMessage);
     return;
   }
@@ -152,15 +151,17 @@ const commands: ActionFunction = (
   client.chat.postMessage(message);
 };
 
-const challengePlayer: ActionFunction = async (
+const challengePlayer: ActionFunction<[string]> = async (
   client,
   msg,
-  name,
+  [name],
 ) => {
   console.log('[challengePlayer]');
   const message: ChatPostMessageArguments = {
     text: '',
+    mrkdwn: true,
     channel: msg.channel,
+    blocks: [],
   };
 
   const invalidNameText = 'PLACEHOLDER TEXT';
@@ -171,18 +172,56 @@ const challengePlayer: ActionFunction = async (
     return;
   }
 
-  const { data } = await axios.post<IActionResponse>('challenge-player', {
+  const { data } = await axios.post<IActionResponse<Match>>('challenge-player', {
     initiator: msg.user,
     target: name,
   });
 
   if (data.error) {
-    const errorMessage = buildErrorMessage(msg, data);
+    const errorMessage = buildErrorMessage(msg.channel, data);
     client.chat.postMessage(errorMessage);
     return;
   }
 
-  message.text = data.details;
+  const challengeStatementBlock: SectionBlock = {
+    type: 'section',
+    text: {
+      type: 'mrkdwn',
+      text: `🏓🏓 ${data.details} 🏓🏓`,
+    },
+  };
+
+  console.log(data);
+  const actionBlock: ActionsBlock = {
+    type: 'actions',
+    elements: [
+      {
+        type: 'button',
+        text: {
+          type: 'plain_text',
+          text: 'Accept',
+        },
+        style: 'primary',
+        action_id: 'accept_challenge',
+        value: data?.data?._id,
+      },
+      {
+        type: 'button',
+        text: {
+          type: 'plain_text',
+          text: 'Decline',
+        },
+        style: 'danger',
+        action_id: 'decline_challenge',
+        value: data?.data?._id,
+      },
+    ],
+  };
+
+  message.blocks = [
+    challengeStatementBlock,
+    actionBlock,
+  ];
 
   const { channels } = await client.channels.list() as IChannelListApiResult;
   const challengeChannel = channels.find(channel => channel.name === process.env.CHALLENGE_CHANNEL);
@@ -195,6 +234,32 @@ const challengePlayer: ActionFunction = async (
 
   message.text = `Could not find channel with name: ${process.env.CHALLENGE_CHANNEL}. Check your .env file.`;
   client.chat.postMessage(message);
+};
+
+const reportResult: ActionFunction<[string, string]> = async (
+  client,
+  msg,
+  [myScore, opponentScore],
+) => {
+  console.log('[reportResult]');
+  const message: ChatPostMessageArguments = {
+    text: '',
+    channel: msg.channel,
+  };
+
+  if (!myScore || !opponentScore) {
+    message.text = 'Missing command parameters';
+    client.chat.postMessage(message);
+    return
+  }
+
+  const payload = {
+    slackId: msg.user,
+    myScore,
+    opponentScore,
+  };
+
+  await axios.post<IActionResponse>('report-match-result', payload);
 };
 
 // const openChallenge: ActionFunction = async (
@@ -213,4 +278,5 @@ export {
   changeNickname,
   commands,
   challengePlayer,
+  reportResult,
 };

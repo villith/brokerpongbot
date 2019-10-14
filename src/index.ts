@@ -1,6 +1,5 @@
-import { IActionEvent, IChannelListApiResult, IMessageEvent } from './types';
-import { IActionResponse, Match } from '@team-scott/domain';
-import { buildMatchMessage, executeCommand } from './helpers';
+import { IMessageEvent, IResponseAction } from './types';
+import { executeCommand, handleUserResponse, refreshCurrentMatches } from './helpers';
 
 import { WebClient } from '@slack/web-api';
 import axios from 'axios';
@@ -10,6 +9,7 @@ import { createMessageAdapter } from '@slack/interactive-messages';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
 import express from 'express';
+import morgan from 'morgan';
 
 dotenv.config();
 
@@ -27,6 +27,7 @@ const userClient = new WebClient(process.env.SLACK_USER_TOKEN);
 
 const app = express();
 
+app.use(morgan('dev'));
 app.use('/events', slackEvents.requestListener());
 app.use('/actions', slackActions.requestListener());
 app.use(bodyParser());
@@ -36,37 +37,18 @@ const server = createServer(app);
 server.listen(port, async () => {
   // @ts-ignore
   console.log(`Listening for events on ${server.address().port}`);
-  const { channels } = await client.channels.list() as IChannelListApiResult;
-  const matchStatusChannel = channels.find(channel => channel.name === process.env.MATCH_STATUS_CHANNEL);
-  
-  if (matchStatusChannel) {
-    const { messages } = await userClient.channels.history({ channel: matchStatusChannel.id });
-    const promises = Object.values(messages as object).map(message => userClient.chat.delete({
-      channel: matchStatusChannel.id,
-      ts: message.ts,
-    }));
-    await Promise.all(promises);
- 
-    const { data } = await axios.get<IActionResponse<Match[]>>('getOngoingMatches');    
-  
-    if (data?.data?.length) {
-      const message = await buildMatchMessage(userClient, matchStatusChannel.id, data?.data?.[0]);
-      client.chat.postMessage(message);
-    }
-  }
+  await refreshCurrentMatches(client, userClient);
 });
 
-slackEvents.on('message', (event: IMessageEvent) => {
+slackEvents.on('message', async (event: IMessageEvent) => {
   const { text } = event;
 
   // Early return if message is not a command
   if (text?.charAt(0) !== CMD) { return; }
 
-  executeCommand(event, client);
-  
-  return;
+  await executeCommand(event, client, userClient);
 });
 
-slackActions.action('action', (payload: IActionEvent, res) => {
-  console.dir(payload, { depth: null });
+slackActions.action({}, (payload: IResponseAction, res) => {
+  handleUserResponse(payload, client);
 });

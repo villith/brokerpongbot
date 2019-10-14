@@ -1,4 +1,4 @@
-import { challengePlayer, changeNickname, commands, register } from './actions';
+import { challengePlayer, changeNickname, commands, register, reportResult } from './actions';
 
 import { CommandListMap } from '../types';
 
@@ -35,6 +35,14 @@ const COMMANDS: CommandListMap = {
     roles: ['ADMIN', 'USER'],
     arguments: ['player/nickname']
   },
+  reportresult: {
+    name: 'reportResult',
+    description: 'Reports the result of a completed game',
+    aliases: ['submit', 'submitresult'],
+    action: reportResult,
+    roles: ['ADMIN', 'USER'],
+    arguments: ['my score', 'opponent\'s score']
+  }
 };
 
 export default COMMANDS;

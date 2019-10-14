@@ -1,22 +1,79 @@
 import { MessageAttachment, WebAPICallResult, WebClient } from "@slack/web-api";
 
-export type Commands = 'register' | 'commands' | 'changenickname' | 'challengeplayer';
+import { Match } from "@team-scott/domain";
 
-export type ActionFunction = (
+export type Commands = 'register'
+| 'commands'
+| 'changenickname'
+| 'challengeplayer'
+| 'reportresult';
+
+export type ResponseActions = 'accept_challenge'
+| 'decline_challenge';
+
+export type ActionFunction<args = undefined> = (
   client: WebClient,
   msg: IMessageEvent,
-  ...args: string[]
+  args: args
 ) => unknown;
 
-export type CommandListMap = Record<Commands, ICommand>;
+export type ResponseActionFunction = (
+  client: WebClient,
+  details: {
+    action: IAction;
+    channel: Pick<IChannel, 'id' | 'name'>;
+    match?: Match;
+    user: IUser;
+  },
+) => unknown;
+
+export type ResponseActionListMap = Record<ResponseActions, ResponseActionFunction>;
+export type CommandListMap = Record<Commands, ICommand<unknown>>;
 
 export type Permissions = 'ADMIN' | 'USER';
 
-export interface ICommand {
+export interface IResponseAction {
+  type: 'block_actions' | 'dialog' | 'interactive_message';
+  team: ITeam;
+  user: IUser;
+  api_app_id: string;
+  token: string;
+  container: IContainer;
+  trigger_id: string;
+  channel: Pick<IChannel, 'id' | 'name'>;
+  message: IMessageEvent;
+  response_url: string;
+  actions: IAction[]; // useless. array the actions within the blocks
+}
+
+interface IAction {
+  action_id: string;
+  block_id: string;
+  value: string;
+  style: string;
+  type: string;
+  action_ts: string;
+}
+
+interface IContainer {
+  type: string;
+  message_ts: string;
+  channel_id: string;
+  is_ephemeral: boolean;
+}
+
+interface IUser {
+  id: string;
+  username: string;
+  name: string;
+  team_id: string;
+}
+
+export interface ICommand<args> {
   name: string;
   description: string;
   aliases: string[];
-  action: ActionFunction;
+  action: ActionFunction<args>;
   roles: Permissions[];
   arguments: string[];
 }
