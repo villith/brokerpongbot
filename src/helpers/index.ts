@@ -1,34 +1,43 @@
-import { ChatPostMessageArguments, DividerBlock, MessageAttachment, SectionBlock, WebClient } from "@slack/web-api";
+import { ChatPostMessageArguments, DividerBlock, MessageAttachment, SectionBlock } from "@slack/web-api";
 import { IActionResponse, MATCH_STATUS_LABELS, Match, Player } from '@team-scott/domain';
 import { IChannelListApiResult, ICommand, IMessageEvent, IResponseAction, IUserProfileApiResult, ResponseActions } from "../types";
+import { client, userClient } from './slackClients';
 
 import COMMANDS from "../cmds/cmds";
 import RESPONSES from "../cmds/responses";
 import axios from 'axios';
 
-const executeCommand = async (msg: IMessageEvent, client: WebClient, userClient: WebClient) => {
+const executeCommand = async (msg: IMessageEvent) => {
   const { text } = msg;
 
   // Get everything after command initiator
   const content = text.slice(1);
 
   // Split into args
+  const regex = new RegExp(/(?:"(.+?)" |'(.+?)' |(.+?) )/);
   const [accessor] = content.split(' ');
   const firstSpaceIndex = content.indexOf(' ');
-  const args = [];
+  const parsedArgs = [];
   if (firstSpaceIndex !== -1) {
-    args.push(...content
-      .substring(firstSpaceIndex + 1)
-      .split('"')
-      .map(arg => arg.trim())
-      .filter(arg => arg)
-    );
+    let args = `${content.substring(firstSpaceIndex + 1)} `;
+    while (true) {
+      const match = regex.exec(args);
+  
+      if (!match) {
+        break;
+      }
+  
+      parsedArgs.push(match[3] || match[1] || match[2]);
+  
+      args = args.substr(match[0].length);
+    }
   }
+  console.log(parsedArgs);
   if (accessor) {
     const command = getCommand(accessor);
     if (command) {
-      await command.action(client, msg, args);
-      await refreshCurrentMatches(client, userClient);
+      await command.action(client, msg, parsedArgs);
+      await refreshCurrentMatches();
     }
     else {
       // msg.channel.send(`\`!${command}\` is not a command. Type \`!commands\` for a list of commands.`);
@@ -77,7 +86,28 @@ const buildErrorMessage = (channel: string, payload: IActionResponse<unknown>) =
   return message;
 };
 
-const buildMatchMessage = async (client: WebClient, channel: string, match: Match) => {
+const buildPlayerName = (player: Player, mrkdwn = false) => {
+  let playerName = '';
+  const { nickname, emojiFlair } = player;
+  let { name } = player;
+  if (nickname) {
+    playerName = `${nickname}`;
+    if (mrkdwn) {
+      name = `*(${name})*`;
+    } else {
+      name = `(${name})`;
+    }
+    playerName = `${playerName} ${name}`;
+  } else {
+    playerName = name;
+  }
+  if (emojiFlair) {
+    playerName = `${playerName} ${emojiFlair}`;
+  }
+  return playerName; 
+}
+
+const buildMatchMessage = async (channel: string, match: Match) => {
   console.log('[buildMatchMessage]');
   const message: ChatPostMessageArguments = {
     text: '',
@@ -92,8 +122,8 @@ const buildMatchMessage = async (client: WebClient, channel: string, match: Matc
   const playerOne = initiator as Player;
   const playerTwo = target as Player;
 
-  const slackPlayerOne = await client.users.profile.get({ user: playerOne.slackId }) as IUserProfileApiResult;
-  const slackPlayerTwo = await client.users.profile.get({ user: playerTwo.slackId }) as IUserProfileApiResult;
+  const slackPlayerOne = await userClient.users.profile.get({ user: playerOne.slackId }) as IUserProfileApiResult;
+  const slackPlayerTwo = await userClient.users.profile.get({ user: playerTwo.slackId }) as IUserProfileApiResult;
   
   const statusBlock: SectionBlock = {
     type: 'section',
@@ -107,79 +137,82 @@ const buildMatchMessage = async (client: WebClient, channel: string, match: Matc
     type: 'divider'
   };
 
-  const playerBlocks = (player: Player, slackPlayer: IUserProfileApiResult) => ([
-    {
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `${player.nickname} *(${player.name})* ${player.emojiFlair}`,
-      },
-      fields: [
-        {
+  const playerBlocks = (player: Player, slackPlayer: IUserProfileApiResult) => {
+    const playerName = buildPlayerName(player, true);
+    return [
+      {
+        type: "section",
+        text: {
           type: "mrkdwn",
-          text: "*Elo*\n1650"
+          text: playerName,
         },
-        {
-          type: "mrkdwn",
-          text: "*Record*\n100-5"
+        fields: [
+          {
+            type: "mrkdwn",
+            text: "*Elo*\n1650"
+          },
+          {
+            type: "mrkdwn",
+            text: "*Record*\n100-5"
+          }
+        ],
+        accessory: {
+          type: "image",
+          image_url: slackPlayer.profile.image_192,
+          alt_text: player.name,
         }
-      ],
-      accessory: {
-        type: "image",
-        image_url: slackPlayer.profile.image_192,
-        alt_text: player.name,
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: "*Recent Matches*"
+        },
+        fields: [
+          {
+            type: "mrkdwn",
+            text: "vs. Raymond"
+          },
+          {
+            type: "mrkdwn",
+            text: "*VICTORY*"
+          },
+          {
+            type: "mrkdwn",
+            text: "vs. Raymond"
+          },
+          {
+            type: "mrkdwn",
+            text: "*VICTORY*"
+          },
+          {
+            type: "mrkdwn",
+            text: "vs. Raymond"
+          },
+          {
+            type: "mrkdwn",
+            text: "*VICTORY*"
+          },
+          {
+            type: "mrkdwn",
+            text: "vs. Raymond"
+          },
+          {
+            type: "mrkdwn",
+            text: "*VICTORY*"
+          },
+          {
+            type: "mrkdwn",
+            text: "vs. Raymond"
+          },
+          {
+            type: "mrkdwn",
+            text: "*VICTORY*"
+          }
+        ]
       }
-    },
-    {
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: "*Recent Matches*"
-      },
-      fields: [
-        {
-          type: "mrkdwn",
-          text: "vs. Raymond"
-        },
-        {
-          type: "mrkdwn",
-          text: "*VICTORY*"
-        },
-        {
-          type: "mrkdwn",
-          text: "vs. Raymond"
-        },
-        {
-          type: "mrkdwn",
-          text: "*VICTORY*"
-        },
-        {
-          type: "mrkdwn",
-          text: "vs. Raymond"
-        },
-        {
-          type: "mrkdwn",
-          text: "*VICTORY*"
-        },
-        {
-          type: "mrkdwn",
-          text: "vs. Raymond"
-        },
-        {
-          type: "mrkdwn",
-          text: "*VICTORY*"
-        },
-        {
-          type: "mrkdwn",
-          text: "vs. Raymond"
-        },
-        {
-          type: "mrkdwn",
-          text: "*VICTORY*"
-        }
-      ]
-    }
-  ]);
+    ]
+  };
 
   message.blocks = [
     statusBlock,
@@ -193,7 +226,7 @@ const buildMatchMessage = async (client: WebClient, channel: string, match: Matc
   return message;
 };
 
-const refreshCurrentMatches = async (client: WebClient, userClient: WebClient) => {
+const refreshCurrentMatches = async () => {
   const { channels } = await client.channels.list() as IChannelListApiResult;
   const matchStatusChannel = channels.find(channel => channel.name === process.env.MATCH_STATUS_CHANNEL);
   
@@ -208,13 +241,13 @@ const refreshCurrentMatches = async (client: WebClient, userClient: WebClient) =
     const { data } = await axios.get<IActionResponse<Match[]>>('getOngoingMatches');    
   
     if (data?.data?.length) {
-      const message = await buildMatchMessage(userClient, matchStatusChannel.id, data?.data?.[0]);
+      const message = await buildMatchMessage(matchStatusChannel.id, data?.data?.[0]);
       client.chat.postMessage(message);
     }
   }
 };
 
-const handleUserResponse = (payload: IResponseAction, client: WebClient) => {
+const handleUserResponse = async (payload: IResponseAction) => {
   const {
     actions,
     channel,
@@ -231,14 +264,18 @@ const handleUserResponse = (payload: IResponseAction, client: WebClient) => {
     const responseAction = actionId as ResponseActions;
     const responseActionFunction = RESPONSES[responseAction];
     responseActionFunction(client, { action, channel, user });
+    await refreshCurrentMatches();
   }
 }
 
 export {
   buildErrorMessage,
   buildMatchMessage,
+  buildPlayerName,
+  client,
   getCommand,
   executeCommand,
   handleUserResponse,
   refreshCurrentMatches,
+  userClient,
 };

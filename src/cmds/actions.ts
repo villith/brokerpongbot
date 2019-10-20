@@ -1,10 +1,10 @@
-import { ActionFunction, IChannelListApiResult, IUserInfoApiResult } from "../types";
+import { ActionFunction, IChannelListApiResult, IOpenIMChannelApiResult, IUserInfoApiResult } from "../types";
 import { ActionsBlock, Block, ChatPostMessageArguments, ContextBlock, DividerBlock, SectionBlock } from "@slack/web-api";
-import { IActionResponse, Match } from "@team-scott/domain";
+import { IActionResponse, Match, Player } from "@team-scott/domain";
+import { buildErrorMessage, buildPlayerName } from "../helpers";
 
 import COMMANDS from "./cmds";
 import axios from 'axios';
-import { buildErrorMessage } from "../helpers";
 
 const register: ActionFunction = async (
   client,
@@ -157,7 +157,7 @@ const challengePlayer: ActionFunction<[string]> = async (
   [name],
 ) => {
   console.log('[challengePlayer]');
-  const message: ChatPostMessageArguments = {
+  const channelMessage: ChatPostMessageArguments = {
     text: '',
     mrkdwn: true,
     channel: msg.channel,
@@ -167,8 +167,8 @@ const challengePlayer: ActionFunction<[string]> = async (
   const invalidNameText = 'PLACEHOLDER TEXT';
 
   if (!name) {
-    message.text = invalidNameText;
-    client.chat.postMessage(message);
+    channelMessage.text = invalidNameText;
+    client.chat.postMessage(channelMessage);
     return;
   }
 
@@ -191,7 +191,33 @@ const challengePlayer: ActionFunction<[string]> = async (
     },
   };
 
-  console.log(data);
+  const initiator = data?.data?.initiator as Player;
+  const target = data?.data?.target as Player;
+
+  const targetChannel = await client.im.open({
+    user: target.slackId,
+    return_im: true,
+  }) as IOpenIMChannelApiResult;
+
+  const imMessage: ChatPostMessageArguments = {
+    text: '',
+    mrkdwn: true,
+    channel: targetChannel.channel.id,
+    blocks: [],
+  };
+
+  const initiatorName = buildPlayerName(initiator, true);
+
+  const challengeIMBlock: SectionBlock = {
+    type: 'section',
+    text: {
+      type: 'mrkdwn',
+      text: `You have been challenged to a match by ${initiatorName}`,
+    },
+  };
+
+  console.log(challengeIMBlock);
+
   const actionBlock: ActionsBlock = {
     type: 'actions',
     elements: [
@@ -218,8 +244,12 @@ const challengePlayer: ActionFunction<[string]> = async (
     ],
   };
 
-  message.blocks = [
+  channelMessage.blocks = [
     challengeStatementBlock,
+  ];
+
+  imMessage.blocks = [
+    challengeIMBlock,
     actionBlock,
   ];
 
@@ -227,13 +257,14 @@ const challengePlayer: ActionFunction<[string]> = async (
   const challengeChannel = channels.find(channel => channel.name === process.env.CHALLENGE_CHANNEL);
 
   if (challengeChannel) {
-    message.channel = challengeChannel.id;
-    client.chat.postMessage(message);
+    channelMessage.channel = challengeChannel.id;
+    client.chat.postMessage(channelMessage);
+    client.chat.postMessage(imMessage);
     return;
   }
 
-  message.text = `Could not find channel with name: ${process.env.CHALLENGE_CHANNEL}. Check your .env file.`;
-  client.chat.postMessage(message);
+  channelMessage.text = `Could not find channel with name: ${process.env.CHALLENGE_CHANNEL}. Check your .env file.`;
+  client.chat.postMessage(channelMessage);
 };
 
 const reportResult: ActionFunction<[string, string]> = async (
@@ -242,6 +273,7 @@ const reportResult: ActionFunction<[string, string]> = async (
   [myScore, opponentScore],
 ) => {
   console.log('[reportResult]');
+  console.log(msg);
   const message: ChatPostMessageArguments = {
     text: '',
     channel: msg.channel,
@@ -259,7 +291,17 @@ const reportResult: ActionFunction<[string, string]> = async (
     opponentScore,
   };
 
-  await axios.post<IActionResponse>('report-match-result', payload);
+  const { data } = await axios.post<IActionResponse>('report-match-result', payload);
+
+  if (data.error) {
+    const errorMessage = buildErrorMessage(msg.channel, data);
+    client.chat.postMessage(errorMessage);
+    return;
+  }
+  
+  message.text = data.details;
+
+  client.chat.postMessage(message);
 };
 
 // const openChallenge: ActionFunction = async (

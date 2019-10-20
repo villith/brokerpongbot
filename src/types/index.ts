@@ -90,6 +90,12 @@ export interface IMessageEvent {
   channel_type: string;
 }
 
+export interface IOpenIMChannelApiResult extends WebAPICallResult {
+  channel: {
+    id: string;
+  }
+}
+
 export interface IUserProfileApiResult extends WebAPICallResult {
   profile: IProfile;
 }
