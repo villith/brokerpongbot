@@ -118,7 +118,6 @@ const buildMatchMessage = async (channel: string, match: Match) => {
 
   const { initiator, target } = match;
 
-  // Temporary until I understand how typegoose wants to you to use populated values
   const playerOne = initiator as Player;
   const playerTwo = target as Player;
 

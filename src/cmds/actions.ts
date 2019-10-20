@@ -1,6 +1,6 @@
 import { ActionFunction, IChannelListApiResult, IOpenIMChannelApiResult, IUserInfoApiResult } from "../types";
-import { ActionsBlock, Block, ChatPostMessageArguments, ContextBlock, DividerBlock, SectionBlock } from "@slack/web-api";
-import { IActionResponse, Match, Player } from "@team-scott/domain";
+import { ActionsBlock, Block, ChatPostMessageArguments, ContextBlock, DividerBlock, MessageAttachment, SectionBlock } from "@slack/web-api";
+import { IActionResponse, IEloChange, Match, Player } from "@team-scott/domain";
 import { buildErrorMessage, buildPlayerName } from "../helpers";
 
 import COMMANDS from "./cmds";
@@ -276,6 +276,7 @@ const reportResult: ActionFunction<[string, string]> = async (
   console.log(msg);
   const message: ChatPostMessageArguments = {
     text: '',
+    mrkdwn: true,
     channel: msg.channel,
   };
 
@@ -291,12 +292,42 @@ const reportResult: ActionFunction<[string, string]> = async (
     opponentScore,
   };
 
-  const { data } = await axios.post<IActionResponse>('report-match-result', payload);
+  const { data } = await axios.post<IActionResponse<IEloChange>>('report-match-result', payload);
 
   if (data.error) {
     const errorMessage = buildErrorMessage(msg.channel, data);
     client.chat.postMessage(errorMessage);
     return;
+  }
+
+  const initiator = data.data?.initiator;
+  const target = data.data?.target;
+
+  const buildValue = (difference: number, original: number) => {
+    let result = '';
+    if (difference > 0) {
+      result = `${original + difference} (+${difference})`;
+    } else {
+      result = `${original + difference} (${difference})`;
+    }
+    return result;
+  };
+
+  if (initiator && target) {
+    const attachment: MessageAttachment = {
+      text: '',
+      fields: [{
+        title: buildPlayerName(initiator, true),
+        value: buildValue(initiator.difference, initiator.originalElo),
+        short: true,
+      }, {
+        title: buildPlayerName(target, true),
+        value: buildValue(target.difference, target.originalElo),
+        short: true,
+      }],
+    }
+
+    message.attachments = [attachment];
   }
   
   message.text = data.details;
