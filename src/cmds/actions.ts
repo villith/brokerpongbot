@@ -1,7 +1,7 @@
 import { ActionFunction, IChannelListApiResult, IOpenIMChannelApiResult, IUserInfoApiResult } from "../types";
 import { ActionsBlock, Block, ChatPostMessageArguments, ContextBlock, DividerBlock, MessageAttachment, SectionBlock } from "@slack/web-api";
-import { IActionResponse, IEloChange, Match, Player } from "@team-scott/domain";
-import { buildErrorMessage, buildPlayerName } from "../helpers";
+import { IActionResponse, IEloChange, INTERVALS, Intervals, Match, Player, Standings } from "@team-scott/domain";
+import { buildCommandExample, buildErrorMessage, buildPlayerName } from "../helpers";
 
 import COMMANDS from "./cmds";
 import axios from 'axios';
@@ -90,7 +90,7 @@ const commands: ActionFunction = (
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*${command.name.charAt(0).toUpperCase()}${command.name.substr(1)}:*  \`${process.env.COMMAND_INITIATOR}${command.name}${command.arguments.map(arg => ` <${arg}>`).join('')}\``,
+        text: `*${command.name.charAt(0).toUpperCase()}${command.name.substr(1)}:*  \`${buildCommandExample(command)}\``,
       },
     };
     const descriptionBlock: SectionBlock = {
@@ -267,10 +267,10 @@ const challengePlayer: ActionFunction<[string]> = async (
   client.chat.postMessage(channelMessage);
 };
 
-const reportResult: ActionFunction<[string, string]> = async (
+const reportResult: ActionFunction<['win' | 'loss']> = async (
   client,
   msg,
-  [myScore, opponentScore],
+  [matchResult],
 ) => {
   console.log('[reportResult]');
   console.log(msg);
@@ -280,16 +280,21 @@ const reportResult: ActionFunction<[string, string]> = async (
     channel: msg.channel,
   };
 
-  if (!myScore || !opponentScore) {
+  if (!matchResult) {
     message.text = 'Missing command parameters';
+    client.chat.postMessage(message);
+    return;
+  }
+
+  if (!['win', 'loss'].includes(matchResult)) {
+    message.text = 'Your command must be in the format `!submit <win / loss>';
     client.chat.postMessage(message);
     return
   }
 
   const payload = {
     slackId: msg.user,
-    myScore,
-    opponentScore,
+    matchResult,
   };
 
   const { data } = await axios.post<IActionResponse<IEloChange>>('report-match-result', payload);
@@ -300,8 +305,8 @@ const reportResult: ActionFunction<[string, string]> = async (
     return;
   }
 
-  const initiator = data.data?.initiator;
-  const target = data.data?.target;
+  const winner = data.data?.winner;
+  const loser = data.data?.loser;
 
   const buildValue = (difference: number, original: number) => {
     let result = '';
@@ -313,16 +318,16 @@ const reportResult: ActionFunction<[string, string]> = async (
     return result;
   };
 
-  if (initiator && target) {
+  if (winner && loser) {
     const attachment: MessageAttachment = {
       text: '',
       fields: [{
-        title: buildPlayerName(initiator, true),
-        value: buildValue(initiator.difference, initiator.originalElo),
+        title: buildPlayerName(winner, true),
+        value: buildValue(winner.difference, winner.originalElo),
         short: true,
       }, {
-        title: buildPlayerName(target, true),
-        value: buildValue(target.difference, target.originalElo),
+        title: buildPlayerName(loser, true),
+        value: buildValue(loser.difference, loser.originalElo),
         short: true,
       }],
     }
@@ -346,10 +351,171 @@ const reportResult: ActionFunction<[string, string]> = async (
 //   };
 // }
 
+const printStandings: ActionFunction<[Intervals]> = async (
+  client,
+  msg,
+  [interval],
+) => {
+  console.log('printStandings');
+  const message: ChatPostMessageArguments = {
+    text: '',
+    mrkdwn: true,
+    channel: msg.channel,
+    blocks: [],
+  };
+
+  if (!INTERVALS.includes(interval)) {
+    message.text = `Your command must be in the format of \`${buildCommandExample(COMMANDS.printstandings)}\``;
+    client.chat.postMessage(message);
+    return;
+  }
+  const { data } = await axios.get<IActionResponse<Standings>>('print-standings', {
+    params: {
+      interval,
+    },
+  });
+
+  
+  const buildStandingsText = () => {
+    let text = '```';
+    const standings = data.data;
+    interface IStandingTextChunk {
+      accessor?: keyof Standings,
+      value?: string | number,
+      length?: number,
+      alignment?: 'left' | 'right'
+    }
+
+    const MAX_LENGTHS: Record<keyof Standings, { length: number, alignment: 'left' | 'right' }> = {
+      playerName: {
+        length: 20,
+        alignment: 'left',
+      },
+      wins: {
+        length: 2,
+        alignment: 'right',
+      },
+      losses: {
+        length: 2,
+        alignment: 'right',
+      },
+      eloChange: {
+        length: 5,
+        alignment: 'right',
+      },
+      currentElo: {
+        length: 6,
+        alignment: 'right',
+      },
+    };
+
+    const setMaxLength = (values: Record<keyof Standings, string | number>) => {
+      Object.entries(values).forEach(([accessor, value]) => {
+        const valueLength = `${value}`.length;
+        if (MAX_LENGTHS[accessor].length < valueLength) {
+          MAX_LENGTHS[accessor].length = valueLength;
+        }
+      });
+    };
+
+    const normalizeValue = ({
+      accessor,
+      value,
+      length = 0,
+      alignment = 'left',
+    }: IStandingTextChunk) => {
+      let result = `${value}`;
+      if (accessor) {
+        length = MAX_LENGTHS[accessor].length;
+        alignment = MAX_LENGTHS[accessor].alignment;
+      }
+      while (result.length < length) {
+        if (alignment === 'left') {
+          result += ' ';
+        }
+        if (alignment === 'right') {
+          result = ` ${result}`;
+        }
+      }
+      return result;
+    }
+
+    if (standings) {
+      const standingsArray = Object.values(standings).sort((a, b) => {
+        return (b.wins - b.losses) - (a.wins - a.losses);
+      });
+      standingsArray.forEach((entry) => {
+        setMaxLength(entry);
+      });
+      const HEADER_CHUNKS: IStandingTextChunk[] = [
+        { value: 'Name', length: MAX_LENGTHS.playerName.length },
+        { value: 'W', accessor: 'wins' },
+        { value: '-', length: 0 },
+        { value: 'L', accessor: 'losses' },
+        { value: '+/-', length: 5, alignment: 'right' },
+        { value: 'Elo', accessor: 'currentElo' },
+        { value: '+/-', accessor: 'eloChange'  },
+      ];
+      const headerLine = HEADER_CHUNKS.map(normalizeValue).join(' ');
+      text += `${headerLine}\n`;
+
+      const separatorLine = Array(headerLine.length).fill('-').join('');
+      text += `${separatorLine}\n`;
+      
+      standingsArray.forEach(({
+        playerName,
+        wins,
+        losses,
+        eloChange,
+        currentElo,
+      }) => {
+        const LINE_CHUNKS: IStandingTextChunk[] = [
+          { accessor: 'playerName', value: playerName },
+          { accessor: 'wins', value: wins },
+          { value: '-', length: 0 },
+          { accessor: 'losses', value: losses },
+          { value: `${wins - losses >= 0 ? '+' : ''}${wins - losses}`, length: 5, alignment: 'right' },
+          { accessor: 'currentElo', value: currentElo },
+          { accessor: 'eloChange', value: `${eloChange >= 0 ? '+' : ''}${eloChange}` },
+        ];
+        const entryLine = LINE_CHUNKS.map(normalizeValue).join(' ');
+        text += `${entryLine}\n`;
+      });
+    }
+    text += '```';
+    return text;
+  }
+
+
+  const titleBlock: SectionBlock = {
+    type: 'section',
+    text: {
+      type: 'mrkdwn',
+      text: `*${data.details.charAt(0).toUpperCase()}${data.details.substr(1)}*`,
+    },
+  };
+
+  const standingsBlock: SectionBlock = {
+    type: 'section',
+    text: {
+      type: 'mrkdwn',
+      text: buildStandingsText(),
+    },
+  };
+
+  message.blocks = [
+    titleBlock,
+    standingsBlock,
+  ];
+
+  client.chat.postMessage(message);
+};
+
 export {
   register,
   changeNickname,
   commands,
   challengePlayer,
   reportResult,
+  printStandings,
 };

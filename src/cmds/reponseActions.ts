@@ -1,6 +1,6 @@
+import { ChatPostMessageArguments, ChatUpdateArguments } from "@slack/web-api";
 import { IChannelListApiResult, ResponseActionFunction } from "../types";
 
-import { ChatPostMessageArguments } from "@slack/web-api";
 import { IActionResponse } from "@team-scott/domain";
 import axios from "axios";
 import { buildErrorMessage } from "../helpers";
@@ -9,9 +9,10 @@ const acceptChallenge: ResponseActionFunction = async (
   client,
   details,
 ) => {
-  const message: ChatPostMessageArguments = {
+  const responseMessage: ChatUpdateArguments = {
     text: '',
     channel: details.channel.id,
+    ts: details.message.ts,
   };
 
   const { data } = await axios.post<IActionResponse<{ announcement: string }>>('challenge-response', {
@@ -26,7 +27,7 @@ const acceptChallenge: ResponseActionFunction = async (
     return;
   }
 
-  message.text = data.details;
+  responseMessage.text = data.details;
 
   const { channels } = await client.channels.list() as IChannelListApiResult;
   const challengeChannel = channels.find(channel => channel.name === process.env.CHALLENGE_CHANNEL);
@@ -39,10 +40,12 @@ const acceptChallenge: ResponseActionFunction = async (
       channel: challengeChannel.id,
     }
     client.chat.postMessage(channelMessage);
-    return;
   }
 
-  client.chat.postMessage(message);
+  console.dir(responseMessage);
+
+  client.chat.update(responseMessage);
+  client.chat.postMessage(responseMessage);
 };
 
 const declineChallenge: ResponseActionFunction = async (

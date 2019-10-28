@@ -1,4 +1,4 @@
-import { challengePlayer, changeNickname, commands, register, reportResult } from './actions';
+import { challengePlayer, changeNickname, commands, printStandings, register, reportResult } from './actions';
 
 import { CommandListMap } from '../types';
 
@@ -41,8 +41,16 @@ const COMMANDS: CommandListMap = {
     aliases: ['submit', 'submitresult'],
     action: reportResult,
     roles: ['ADMIN', 'USER'],
-    arguments: ['my score', 'opponent\'s score']
-  }
+    arguments: ['win / loss']
+  },
+  printstandings: {
+    name: 'printStandings',
+    description: 'Prints the standings of the specified time interval',
+    aliases: ['standings', 'leaderboard'],
+    action: printStandings,
+    roles: ['ADMIN', 'USER'],
+    arguments: ['daily / weekly / monthly / yearly'],
+  },
 };
 
 export default COMMANDS;

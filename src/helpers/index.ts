@@ -250,6 +250,7 @@ const handleUserResponse = async (payload: IResponseAction) => {
   const {
     actions,
     channel,
+    message,
     user,
   } = payload;
 
@@ -262,13 +263,17 @@ const handleUserResponse = async (payload: IResponseAction) => {
   if ({}.hasOwnProperty.call(RESPONSES, actionId)) {
     const responseAction = actionId as ResponseActions;
     const responseActionFunction = RESPONSES[responseAction];
-    responseActionFunction(client, { action, channel, user });
+    responseActionFunction(client, { action, channel, message, user });
     await refreshCurrentMatches();
   }
-}
+};
+
+const buildCommandExample = (command: ICommand<unknown>) => 
+  `${process.env.COMMAND_INITIATOR}${command.name}${command.arguments.map(arg => ` <${arg}>`).join('')}`;
 
 export {
   buildErrorMessage,
+  buildCommandExample,
   buildMatchMessage,
   buildPlayerName,
   client,

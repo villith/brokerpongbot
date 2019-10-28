@@ -6,7 +6,8 @@ export type Commands = 'register'
 | 'commands'
 | 'changenickname'
 | 'challengeplayer'
-| 'reportresult';
+| 'reportresult'
+| 'printstandings';
 
 export type ResponseActions = 'accept_challenge'
 | 'decline_challenge';
@@ -23,6 +24,7 @@ export type ResponseActionFunction = (
     action: IAction;
     channel: Pick<IChannel, 'id' | 'name'>;
     match?: Match;
+    message: IMessageEvent;
     user: IUser;
   },
 ) => unknown;
