@@ -33,7 +33,7 @@ const COMMANDS: CommandListMap = {
     aliases: ['challenge', 'play'],
     action: challengePlayer,
     roles: ['ADMIN', 'USER'],
-    arguments: ['player/nickname']
+    arguments: ['player/nickname/@slackId']
   },
   reportresult: {
     name: 'reportResult',

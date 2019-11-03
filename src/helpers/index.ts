@@ -7,6 +7,11 @@ import COMMANDS from "../cmds/cmds";
 import RESPONSES from "../cmds/responses";
 import axios from 'axios';
 
+type TempMatch = Match & {
+  playerOneRecentMatches: Match[];
+  playerTwoRecentMatches: Match[];
+}
+
 const executeCommand = async (msg: IMessageEvent) => {
   const { text } = msg;
 
@@ -36,6 +41,7 @@ const executeCommand = async (msg: IMessageEvent) => {
   if (accessor) {
     const command = getCommand(accessor);
     if (command) {
+      console.log(command);
       await command.action(client, msg, parsedArgs);
       await refreshCurrentMatches();
     }
@@ -47,7 +53,7 @@ const executeCommand = async (msg: IMessageEvent) => {
 };
 
 const getCommand = (accessor: string) => {
-  let retVal = {} as ICommand<unknown>;
+  let retVal;
   const normalized = accessor.toLowerCase().trim();
   if ({}.hasOwnProperty.call(COMMANDS, normalized)) {
     retVal = COMMANDS[normalized];
@@ -107,8 +113,9 @@ const buildPlayerName = (player: Player, mrkdwn = false) => {
   return playerName; 
 }
 
-const buildMatchMessage = async (channel: string, match: Match) => {
+const buildMatchMessage = async (channel: string, match: TempMatch) => {
   console.log('[buildMatchMessage]');
+  console.dir(match);
   const message: ChatPostMessageArguments = {
     text: '',
     mrkdwn: true,
@@ -116,7 +123,8 @@ const buildMatchMessage = async (channel: string, match: Match) => {
     blocks: [],
   };
 
-  const { initiator, target } = match;
+  // @ts-ignore
+  const { acceptedAt, initiator, target, status } = match._doc;
 
   const playerOne = initiator as Player;
   const playerTwo = target as Player;
@@ -128,7 +136,7 @@ const buildMatchMessage = async (channel: string, match: Match) => {
     type: 'section',
     text: {
       type: 'mrkdwn',
-      text: `🏓🏓 *MATCH ${MATCH_STATUS_LABELS[match.status].toUpperCase()}* 🏓🏓 ${match.acceptedAt ? ` - Started at *${match.acceptedAt}*` : ''}`,
+      text: `🏓🏓 *MATCH ${MATCH_STATUS_LABELS[status].toUpperCase()}* 🏓🏓 ${acceptedAt ? ` - Started at *${acceptedAt}*` : ''}`,
     }
   };
 
@@ -136,9 +144,32 @@ const buildMatchMessage = async (channel: string, match: Match) => {
     type: 'divider'
   };
 
-  const playerBlocks = (player: Player, slackPlayer: IUserProfileApiResult) => {
+  const playerBlocks = (
+    player: Player,
+    slackPlayer: IUserProfileApiResult,
+    recentMatches: Match[],
+  ) => {
     const playerName = buildPlayerName(player, true);
-    return [
+    const recentMatchesFields = recentMatches.reduce((acc, cv) => {
+      const _initiator = cv.initiator as Player;
+      const _target = cv.target as Player;
+      const currentPlayer = (_initiator._id === player._id ? _initiator : _target) as Player;
+      const otherPlayer = (_initiator._id === player._id ? _target : _initiator) as Player;
+
+      acc.push(
+      {
+        type: 'mrkdwn',
+        text: `vs. ${buildPlayerName(otherPlayer, false)}`
+      },
+      {
+        type: 'mrkdwn',
+        text: `*${cv.winner.toString() === currentPlayer._id ? 'VICTORY' : 'DEFEAT'}*`,
+      }
+      );
+      return acc;
+    }, [] as Array<{ type: 'mrkdwn' | 'plain_text'; text: string }>);
+    
+    const blocks: SectionBlock[] = [
       {
         type: "section",
         text: {
@@ -148,11 +179,11 @@ const buildMatchMessage = async (channel: string, match: Match) => {
         fields: [
           {
             type: "mrkdwn",
-            text: "*Elo*\n1650"
+            text: `*Elo*\n${player.elo}`
           },
           {
             type: "mrkdwn",
-            text: "*Record*\n100-5"
+            text: `*Record*\n${player.wins}-${player.losses}`,
           }
         ],
         accessory: {
@@ -161,66 +192,32 @@ const buildMatchMessage = async (channel: string, match: Match) => {
           alt_text: player.name,
         }
       },
-      {
+    ];
+
+    if (recentMatchesFields.length > 0) {
+      blocks.push({
         type: "section",
         text: {
-          type: "mrkdwn",
+          type: 'mrkdwn',
           text: "*Recent Matches*"
         },
-        fields: [
-          {
-            type: "mrkdwn",
-            text: "vs. Raymond"
-          },
-          {
-            type: "mrkdwn",
-            text: "*VICTORY*"
-          },
-          {
-            type: "mrkdwn",
-            text: "vs. Raymond"
-          },
-          {
-            type: "mrkdwn",
-            text: "*VICTORY*"
-          },
-          {
-            type: "mrkdwn",
-            text: "vs. Raymond"
-          },
-          {
-            type: "mrkdwn",
-            text: "*VICTORY*"
-          },
-          {
-            type: "mrkdwn",
-            text: "vs. Raymond"
-          },
-          {
-            type: "mrkdwn",
-            text: "*VICTORY*"
-          },
-          {
-            type: "mrkdwn",
-            text: "vs. Raymond"
-          },
-          {
-            type: "mrkdwn",
-            text: "*VICTORY*"
-          }
-        ]
-      }
-    ]
+        fields: recentMatchesFields,
+      });
+    }
+
+    return blocks;
   };
 
   message.blocks = [
     statusBlock,
     dividerBlock,
-    ...playerBlocks(playerOne, slackPlayerOne),
+    ...playerBlocks(playerOne, slackPlayerOne, match.playerOneRecentMatches),
     dividerBlock,
-    ...playerBlocks(playerTwo, slackPlayerTwo),
+    ...playerBlocks(playerTwo, slackPlayerTwo, match.playerTwoRecentMatches),
     dividerBlock,
   ];
+
+  console.log('done building');
 
   return message;
 };
@@ -237,8 +234,7 @@ const refreshCurrentMatches = async () => {
     }));
     await Promise.all(promises);
  
-    const { data } = await axios.get<IActionResponse<Match[]>>('getOngoingMatches');    
-  
+    const { data } = await axios.get<IActionResponse<TempMatch[]>>('getOngoingMatches');    
     if (data?.data?.length) {
       const message = await buildMatchMessage(matchStatusChannel.id, data?.data?.[0]);
       client.chat.postMessage(message);

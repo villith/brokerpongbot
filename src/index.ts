@@ -37,7 +37,6 @@ server.listen(port, async () => {
     await refreshCurrentMatches();
   } catch (err) {
     console.log('server listen');
-    console.trace();
     console.log(err);
   }
 });
@@ -52,8 +51,8 @@ slackEvents.on('message', async (event: IMessageEvent) => {
     await executeCommand(event);
   } catch (err) {
     console.log('on msg');
-    console.trace();
     console.log(err);
+    console.trace();
   }
 });
 

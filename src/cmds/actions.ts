@@ -46,7 +46,7 @@ const changeNickname: ActionFunction<[string, string]> = async (
     channel: msg.channel,
   };
 
-  const invalidNameText = 'Nickname was not updated. You must provide the user\'s name and the intended nickname. `!changeNickname <name> <nickname>`';
+  const invalidNameText = 'Nickname was not updated. You must provide the user\'s name and the intended nickname. `!changeNickname <name/nickname/@slackId> <nickname>`';
   if (!name || !nickname) {
     message.text = invalidNameText;
     client.chat.postMessage(message);
